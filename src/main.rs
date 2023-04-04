@@ -2,7 +2,7 @@ use indicatif::ProgressBar;
 use std::{
     collections::HashMap,
     fs::{create_dir_all, read_dir},
-    path::PathBuf,
+    sync::{Arc, Mutex},
     thread,
 };
 
@@ -11,8 +11,10 @@ use structopt::*;
 
 use crate::{converters::Converter, tts::TTS};
 
+mod command;
 mod converters;
 mod tts;
+mod ui;
 
 #[derive(Debug, StructOpt)]
 struct Opt {
@@ -29,7 +31,8 @@ struct Opt {
     author: String,
 }
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
     let srcdir = opt.srcdir;
     let outdir = opt.outdir;
@@ -40,13 +43,19 @@ fn main() -> anyhow::Result<()> {
 
     let mut all_files = vec![];
     for file in read_dir(&srcdir)? {
-        all_files.push(file?);
+        if let Ok(file) = file {
+            if let Ok(filetype) = file.file_type() {
+                if filetype.is_file() {
+                    all_files.push(file);
+                }
+            }
+        }
     }
 
     println!("Converting {} files.", all_files.len());
-    let pb = ProgressBar::new(all_files.len());
+    let pb = Arc::new(Mutex::new(ProgressBar::new((all_files.len() + 1) as u64)));
+    pb.lock().expect("TODO").inc(1);
 
-    let mut handles = Vec::with_capacity(all_files.len());
     for file in all_files.iter() {
         let path = file.path();
         let basename = path
@@ -62,31 +71,21 @@ fn main() -> anyhow::Result<()> {
         let outdir = outdir.clone();
         let audiobook_author = audiobook_author.clone();
         let audiobook_name = audiobook_name.clone();
-        let handle = thread::spawn(move || {
-            let pathstr = path.to_str().unwrap();
-            // println!("Converting {:?} to {:?}", &path, &outdir);
+        let pb = pb.clone();
 
-            let tts = TTS::new().expect("TODO");
-            let aiff = tts.say(&pathstr, &outdir).expect("TODO").path;
+        let pathstr = path.to_str().unwrap();
 
-            // println!("Converted to aiff in {:?}", &aiff);
+        let tts = TTS::new().expect("TODO");
+        let aiff = tts.say(&pathstr, &outdir).await.expect("TODO").path;
 
-            let metadata = HashMap::from([
-                ("title", &chapter_name),
-                ("album", &audiobook_name),
-                ("author", &audiobook_author),
-            ]);
-            let mp3out = format!("{}/{}.mp3", &outdir, &chapter_name);
-            let _ = Converter::convert_aiff_to_mp3(&aiff, &mp3out, &metadata).expect("TODO");
-            pb.inc(1);
-
-            // println!("Converted to mp3 in {:?}", &mp3out);
-        });
-        handles.push(handle);
-    }
-
-    for handle in handles {
-        let _ = handle.join();
+        let metadata = HashMap::from([
+            ("title", &chapter_name),
+            ("album", &audiobook_name),
+            ("author", &audiobook_author),
+        ]);
+        let mp3out = format!("{}/{}.mp3", &outdir, &chapter_name);
+        let _ = Converter::convert_aiff_to_mp3(&aiff, &mp3out, &metadata).expect("TODO");
+        pb.lock().expect("TODO").inc(1);
     }
     Ok(())
 }

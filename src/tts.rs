@@ -6,11 +6,8 @@ use std::{
 };
 
 use anyhow::anyhow;
-use tempfile::NamedTempFile;
 
-pub(crate) struct TTS {
-    tmp_dir: PathBuf,
-}
+pub(crate) struct TTS {}
 
 pub(crate) struct AiffSoundFile {
     // TODO yes, this should be a path, sue me.
@@ -21,13 +18,10 @@ impl TTS {
     pub fn new() -> anyhow::Result<Self> {
         // let tts = Tts::default()?;
         let tmp_dir = temp_dir();
-        Ok(Self {
-            // inner: tts,
-            tmp_dir,
-        })
+        Ok(Self {})
     }
 
-    pub fn say(&self, input_file: &str, outdir: &str) -> anyhow::Result<AiffSoundFile> {
+    pub async fn say(&self, input_file: &str, outdir: &str) -> anyhow::Result<AiffSoundFile> {
         let outfile = format!("{}/testfile.aiff", outdir);
         let output = Command::new("say")
             .arg(&format!("--input-file={}", input_file))
