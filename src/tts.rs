@@ -1,5 +1,7 @@
 use std::{
+    collections::hash_map::DefaultHasher,
     env::temp_dir,
+    hash::{Hash, Hasher},
     io::{Bytes, Read},
     path::PathBuf,
     process::Command,
@@ -22,7 +24,10 @@ impl TTS {
     }
 
     pub async fn say(&self, input_file: &str, outdir: &str) -> anyhow::Result<AiffSoundFile> {
-        let outfile = format!("{}/testfile.aiff", outdir);
+        let mut hasher = DefaultHasher::new();
+        input_file.hash(&mut hasher);
+        let hash = hasher.finish();
+        let outfile = format!("{}/{}.aiff", outdir, hash);
         let output = Command::new("say")
             .arg(&format!("--input-file={}", input_file))
             .arg(&format!("--output-file={}", outfile))

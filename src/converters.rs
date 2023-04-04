@@ -5,6 +5,8 @@ use std::{
 
 use anyhow::Context;
 
+use crate::command::AsyncCommand;
+
 pub struct Converter;
 
 const FFMPEG: &'static str = "ffmpeg";
@@ -14,17 +16,19 @@ impl Converter {
         input_file: &str,
         output_file: &str,
         metadata: &HashMap<&str, &String>,
-    ) -> anyhow::Result<Output> {
-        let mut binding = Command::new(FFMPEG);
-        let command = binding.arg("-i").arg(input_file);
+    ) -> anyhow::Result<AsyncCommand> {
+        // TODO get rid of all these to strings
+        let mut args = vec![FFMPEG.to_string()];
+        // Overwrite existing files
+        args.push("-y".to_string());
+        args.push("-i".to_string());
+        args.push(input_file.to_string());
 
         for (k, v) in metadata.iter() {
-            command.arg("-metadata").arg(&format!("{}={}", k, v));
+            args.push("-metadata".to_string());
+            args.push(format!("{}={}", k, v));
         }
-        command
-            .arg(output_file)
-            .output()
-            .context("failed to convert aiff to mp3")
-        // .and_then(|_| Ok(()))
+        args.push(output_file.to_string());
+        AsyncCommand::new(args)
     }
 }

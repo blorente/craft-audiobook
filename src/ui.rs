@@ -15,9 +15,7 @@ pub struct ConsoleUi {
 
 impl ConsoleUi {
     pub fn new() -> anyhow::Result<Self> {
-        let spinner_style = ProgressStyle::with_template("{prefix:.bold.dim} {spinner} {wide_msg}")
-            .unwrap()
-            .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ ");
+        let spinner_style = ProgressStyle::with_template("{prefix:.bold.dim} {wide_msg}").unwrap();
 
         let bar = MultiProgress::new();
         Ok(Self {
@@ -74,7 +72,8 @@ impl ConsoleUiInner {
             .bars
             .remove(&command)
             .ok_or(anyhow!("UiCommandId {:?} not found", command))?;
-        bar.finish_with_message("Done!");
+        bar.set_prefix("[OK]");
+        bar.finish();
         Ok(())
     }
 }
