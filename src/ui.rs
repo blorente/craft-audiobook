@@ -70,7 +70,7 @@ impl ConsoleUiInner {
     pub fn finish_command(&mut self, command: UiCommandId) -> anyhow::Result<()> {
         let mut bar = self
             .bars
-            .remove(&command)
+            .get(&command)
             .ok_or(anyhow!("UiCommandId {:?} not found", command))?;
         bar.set_prefix("[OK]");
         bar.finish();

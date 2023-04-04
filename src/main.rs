@@ -1,7 +1,7 @@
 use indicatif::ProgressBar;
 use std::{
     collections::HashMap,
-    fs::{create_dir_all, read_dir},
+    fs::{create_dir_all, read_dir, remove_file},
     sync::{Arc, Mutex},
     thread::{self},
 };
@@ -62,10 +62,7 @@ async fn main() -> anyhow::Result<()> {
     println!("== Converting {} files. ==", all_files.len());
     let ui = ConsoleUi::new()?;
 
-    // let mut set: JoinSet<anyhow::Result<UiCommandId>> = JoinSet::new();
-    let mut set: JoinSet<anyhow::Result<()>> = JoinSet::new();
-    // TODO The UI can drop threads etween treturning the UI and stuff
-    // Maybe just dn't remove anything.
+    let mut set: JoinSet<anyhow::Result<UiCommandId>> = JoinSet::new();
     for (idx, file) in all_files.iter().enumerate() {
         let path = file.path();
         let basename = path
@@ -88,7 +85,7 @@ async fn main() -> anyhow::Result<()> {
         set.spawn(async move {
             let pathstr = path.to_str().unwrap();
             let mp3out = format!("{}/{}.mp3", &outdir, &chapter_name);
-            // let ui_id = ui.start_command(format!("Converting {} to {}", &chapter_name, &mp3out))?;
+            let ui_id = ui.start_command(format!("Converting {} to {}", &chapter_name, &mp3out))?;
 
             let tts = TTS::new().expect("TODO");
             let aiff = tts.say(&pathstr, &outdir).await.expect("TODO").path;
@@ -96,19 +93,20 @@ async fn main() -> anyhow::Result<()> {
             let metadata = HashMap::from([
                 ("title", &chapter_name),
                 ("album", &audiobook_name),
-                ("author", &audiobook_author),
+                ("artist", &audiobook_author),
                 ("track", &track),
             ]);
             let convert_cmd = Converter::convert_aiff_to_mp3(&aiff, &mp3out, &metadata)?;
             convert_cmd.run().await?;
-            // Ok(ui_id)
-            Ok(())
+
+            remove_file(aiff)?;
+            Ok(ui_id)
         });
     }
 
     while let Some(res) = set.join_next().await {
-        // let ui_id = res??;
-        // ui.finish_command(ui_id)?;
+        let ui_id = res??;
+        ui.finish_command(ui_id)?;
     }
 
     if zipit {
