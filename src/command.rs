@@ -46,5 +46,8 @@ impl AsyncCommand {
 
         Ok(output)
     }
-}
 
+    pub fn message(&self) -> String {
+        format!("{} {}", self.program, self.args.join(" "))
+    }
+}

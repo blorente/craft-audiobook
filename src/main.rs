@@ -9,7 +9,7 @@ use std::{
 use anyhow::Context;
 use structopt::*;
 
-use crate::{converters::Converter, tts::TTS};
+use crate::{converters::Converter, tts::TTS, ui::ConsoleUi};
 
 mod command;
 mod converters;
@@ -53,8 +53,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     println!("Converting {} files.", all_files.len());
-    let pb = Arc::new(Mutex::new(ProgressBar::new((all_files.len() + 1) as u64)));
-    pb.lock().expect("TODO").inc(1);
+    let ui = ConsoleUi::new()?;
 
     for file in all_files.iter() {
         let path = file.path();
@@ -71,12 +70,13 @@ async fn main() -> anyhow::Result<()> {
         let outdir = outdir.clone();
         let audiobook_author = audiobook_author.clone();
         let audiobook_name = audiobook_name.clone();
-        let pb = pb.clone();
 
         let pathstr = path.to_str().unwrap();
 
         let tts = TTS::new().expect("TODO");
+        let say_ui_id = ui.start_command(format!("Say {} to {}", &pathstr, &outdir))?;
         let aiff = tts.say(&pathstr, &outdir).await.expect("TODO").path;
+        ui.finish_command(say_ui_id)?;
 
         let metadata = HashMap::from([
             ("title", &chapter_name),
@@ -84,8 +84,9 @@ async fn main() -> anyhow::Result<()> {
             ("author", &audiobook_author),
         ]);
         let mp3out = format!("{}/{}.mp3", &outdir, &chapter_name);
+        let convert_ui_id = ui.start_command(format!("Convert {} to {}", &aiff, &mp3out))?;
         let _ = Converter::convert_aiff_to_mp3(&aiff, &mp3out, &metadata).expect("TODO");
-        pb.lock().expect("TODO").inc(1);
+        ui.finish_command(convert_ui_id)?;
     }
     Ok(())
 }
